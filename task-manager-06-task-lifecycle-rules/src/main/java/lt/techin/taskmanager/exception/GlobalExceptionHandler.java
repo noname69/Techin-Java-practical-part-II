@@ -1,0 +1,47 @@
+package lt.techin.taskmanager.exception;
+
+import lt.techin.taskmanager.dto.ApiError;
+import lt.techin.taskmanager.dto.FieldError;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+
+import java.util.List;
+
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(TaskNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(TaskNotFoundException ex) {
+        ApiError error = new ApiError(404, "Not Found", ex.getMessage());
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(IllegalTaskStateException.class)
+    public ResponseEntity<ApiError> handleIllegalState(IllegalTaskStateException ex) {
+        ApiError error = new ApiError(409, "Conflict", ex.getMessage());
+        return new ResponseEntity<>(error, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        List<FieldError> errors = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> new FieldError(
+                        error.getField(),
+                        error.getDefaultMessage()))
+                .toList();
+
+        ApiError apiError = new ApiError(
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                "Validation failed.",
+                errors
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
+    }
+}

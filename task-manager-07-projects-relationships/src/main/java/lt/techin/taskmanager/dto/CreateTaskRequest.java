@@ -4,33 +4,33 @@ import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lt.techin.taskmanager.model.TaskStatus;
 
 import java.time.LocalDate;
 
-public class UpdateProjectRequest {
-    @NotBlank
-    @Size(min = 3, max = 100)
-    private String name;
+public class CreateTaskRequest {
 
-    @Size(max = 1000)
+    @NotBlank(message = "must not be blank")
+    @Size(min = 3, max = 100)
+    private String title;
+
+    @Size(max = 1000, message = "too long")
     private String description;
 
-    private Boolean archived;
+    @NotNull(message = "must not be null")
+    @FutureOrPresent
+    private LocalDate dueDate;
 
-    public UpdateProjectRequest() {
+    public CreateTaskRequest() {
 
     }
 
-    public String getName() {
-        return name;
+    public String getTitle() {
+        return title;
     }
 
     public String getDescription() {
         return description;
     }
 
-    public Boolean isArchived() {
-        return archived;
-    }
+    public LocalDate getDueDate() { return dueDate; }
 }

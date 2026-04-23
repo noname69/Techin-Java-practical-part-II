@@ -11,21 +11,20 @@ public class Project {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private String name;
     private String description;
     private boolean archived;
 
-    @OneToMany(mappedBy = "project")
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Task> tasks = new ArrayList<>();
 
-    public Project() {
-    }
+    public Project() {}
 
-    public Project(Long id, String name, String description, boolean archived) {
+    public Project(Long id, String name, String description) {
         this.id = id;
         this.name = name;
         this.description = description;
-        this.archived = archived;
     }
 
     public Long getId() {
@@ -60,5 +59,11 @@ public class Project {
         this.archived = archived;
     }
 
+    public List<Task> getTasks() {
+        return tasks;
+    }
 
+    public void setTasks(List<Task> tasks) {
+        this.tasks = tasks;
+    }
 }

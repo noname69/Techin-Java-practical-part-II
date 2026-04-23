@@ -24,66 +24,37 @@ public class ProjectController {
         this.taskService = taskService;
     }
 
+    // GET /api/projects
     @GetMapping
     public List<ProjectResponse> getAll() {
         return ProjectMapper.toResponseList(projectService.getAll());
     }
 
+    // GET /api/projects/{id}
     @GetMapping("/{id}")
-    ResponseEntity<ProjectResponse> getById(@PathVariable Long id) {
+    public ResponseEntity<ProjectResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ProjectMapper.toResponse(projectService.getById(id)));
     }
 
-//    @GetMapping("/{id}/tasks")
-//    public ResponseEntity<List<Task>> getProjectTasks(
-//            @PathVariable Long id,
-//            @RequestParam(required = false)TaskStatus status
-//            ) {
-//        if(status != null) {
-//            return null;
-//        }
-//
-//        return ResponseEntity.ok(taskService.getByProject(id));
-//    }
+    // GET /api/projects/{id}/tasks
+    @GetMapping("/{id}/tasks")
+    public List<TaskResponse> getTasks(
+            @PathVariable Long id,
+            @RequestParam(required = false)TaskStatus status
+            ) {
+        return taskService.getTasksByProjectId(id);
+    }
 
+    // POST /api/projects
     @PostMapping
     public ResponseEntity<ProjectResponse> create(
-            @RequestBody @Valid CreateProjectRequest request
-    ) {
+            @Valid @RequestBody CreateProjectRequest request
+            ) {
+
         Project project = ProjectMapper.toProject(request);
         Project created = projectService.create(project);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ProjectMapper.toResponse(created));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<ProjectResponse> update(
-            @PathVariable Long id,
-            @RequestBody @Valid UpdateProjectRequest request
-    ) {
-
-        Project projectToUpdate = ProjectMapper.toProject(request, id);
-
-        return ResponseEntity.ok(
-                ProjectMapper.toResponse(
-                        projectService.update(id, projectToUpdate)
-                )
-        );
-    }
-
-    @PatchMapping("/{id}")
-    public ResponseEntity<ProjectResponse> patch(
-            @PathVariable Long id,
-            @RequestBody PatchProjectRequest request
-    ) {
-        Project updated = projectService.patchArchived(id, request.archived());
-        return ResponseEntity.ok(ProjectMapper.toResponse(updated));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        projectService.delete(id);
-        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{projectId}/tasks")
@@ -100,20 +71,38 @@ public class ProjectController {
                 .body(TaskMapper.toResponse(created));
     }
 
-    @GetMapping("/{id}/tasks")
-    public ResponseEntity<List<Task>> getTasks(
+    // PUT /api/projects/{id}
+    @PutMapping("/{id}")
+    public ResponseEntity<ProjectResponse> update(
             @PathVariable Long id,
-            @RequestParam(required = false) TaskStatus status
+            @Valid @RequestBody UpdateProjectRequest request
     ) {
-        List<Task> result;
+        Project projectToUpdate = ProjectMapper.toProject(request, id);
+        Project updatedProject = projectService.update(id, projectToUpdate);
 
-        if (status == null) {
-            result = taskService.getByProject(id);
-        } else {
-            result = taskService.getByProjectAndStatus(id, status);
-        }
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(ProjectMapper.toResponse(updatedProject));
     }
+
+    // PATCH /api/projects/{id}
+    @PatchMapping("/{id}")
+    public ResponseEntity<ProjectResponse> patch(
+            @PathVariable Long id,
+            @Valid @RequestBody PatchProjectRequest request
+    ) {
+        Project updated = projectService.updateArchived(id, request.archived());
+        return ResponseEntity.ok(ProjectMapper.toResponse(updated));
+    }
+
+    // DELETE /api/projects/{id}
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(
+            @PathVariable long id
+    ) {
+        projectService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+
+
 
 }

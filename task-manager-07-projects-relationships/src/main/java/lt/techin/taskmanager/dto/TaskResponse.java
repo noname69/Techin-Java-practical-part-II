@@ -5,10 +5,13 @@ import lt.techin.taskmanager.model.TaskStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public record ProjectResponse(
+public record TaskResponse(
         Long id,
-        String name,
+        String title,
         String description,
-        boolean archived
-        ) {
+        TaskStatus status,
+        LocalDate dueDate,
+        LocalDateTime completedAt,
+        ProjectSummaryResponse project
+) {
 }

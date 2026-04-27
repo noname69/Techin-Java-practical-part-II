@@ -1,0 +1,232 @@
+package lt.techin.taskmanager.service;
+
+import lt.techin.taskmanager.dto.TaskMapper;
+import lt.techin.taskmanager.dto.TaskResponse;
+import lt.techin.taskmanager.exception.*;
+import lt.techin.taskmanager.model.Project;
+import lt.techin.taskmanager.model.Task;
+import lt.techin.taskmanager.model.TaskStatus;
+import lt.techin.taskmanager.model.User;
+import lt.techin.taskmanager.repository.ProjectRepository;
+import lt.techin.taskmanager.repository.TaskRepository;
+import lt.techin.taskmanager.repository.TaskSpecifications;
+import lt.techin.taskmanager.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static lt.techin.taskmanager.model.TaskStatus.DONE;
+import static lt.techin.taskmanager.model.TaskStatus.TODO;
+
+@Service
+public class DefaultTaskService implements TaskService {
+
+    private final TaskRepository taskRepository;
+    private final ProjectRepository projectRepository;
+    private final UserRepository userRepository;
+
+    public DefaultTaskService(TaskRepository taskRepository, ProjectRepository projectRepository, UserRepository userRepository) {
+        this.taskRepository = taskRepository;
+        this.projectRepository = projectRepository;
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    public List<Task> getAll() {
+        return taskRepository.findAll();
+    }
+
+    @Override
+    public Task getById(Long id) {
+        return taskRepository.findById(id)
+                .orElseThrow(() -> new TaskNotFoundException(id));
+    }
+
+    @Override
+    public List<Task> searchByStatus(TaskStatus status) {
+        return taskRepository.findByStatus(status);
+    }
+
+//    public Task create(Long id, Task task) {
+//        Project project = projectRepository.findById(id)
+//                .orElseThrow(() -> new ProjectNotFoundException(id));
+//
+//        if (project.isArchived()) {
+//            throw new ArchivedProjectException(id);
+//        }
+//
+//        task.setProject(project);
+//        task.setStatus(TaskStatus.TODO);
+
+//        if (task.getAssignee() != null) {
+//            User user = userRepository.findById(task.getAssignee())
+//                    .orElseThrow(() -> new UserNotFoundException(task.getAssigneeId()));
+//
+//            task.setAssignee(user);
+//        }
+//
+//        return taskRepository.save(task);
+//    }
+
+    @Override
+    public Task create(Long projectId, Task task, Long assigneeId) {
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ProjectNotFoundException(projectId));
+
+        if (project.isArchived()) {
+            throw new ArchivedProjectException(projectId);
+        }
+
+        if (assigneeId != null) {
+            User user = userRepository.findById(assigneeId)
+                    .orElseThrow(() -> new UserNotFoundException(assigneeId));
+
+            task.setAssignee(user);
+        } else {
+            task.setAssignee(null);
+        }
+
+        task.setProject(project);
+        task.setStatus(TaskStatus.TODO);
+
+        return taskRepository.save(task);
+    }
+
+    @Override
+    public Task update(Long id, Task task, Long projectId, Long assigneeId) {
+
+        Task existing = taskRepository.findById(id)
+                .orElseThrow(() -> new TaskNotFoundException(id));
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ProjectNotFoundException(projectId));
+
+        if (project.isArchived()) {
+            throw new ArchivedProjectException(projectId);
+        }
+
+        if (existing.getStatus() == TaskStatus.DONE && assigneeId != null) {
+            throw new IllegalTaskStateException(
+                    "Task with id " + id + " is completed and cannot be reassigned."
+            );
+        }
+
+        if (assigneeId != null) {
+            User user = userRepository.findById(assigneeId)
+                    .orElseThrow(() -> new UserNotFoundException(assigneeId));
+            existing.setAssignee(user);
+        } else {
+            existing.setAssignee(null);
+        }
+
+        existing.setTitle(task.getTitle());
+        existing.setDescription(task.getDescription());
+        existing.setDueDate(task.getDueDate());
+        existing.setProject(project);
+
+        applyStatusChange(existing, task.getStatus());
+
+        return taskRepository.save(existing);
+    }
+
+    @Override
+    public void applyStatusChange(Task task, TaskStatus newStatus) {
+
+        TaskStatus current = task.getStatus();
+
+        if (current == TODO && newStatus == DONE) {
+            task.setStatus(DONE);
+            task.setCompletedAt(LocalDateTime.now());
+            return;
+        }
+
+        if (task.getStatus() == DONE && newStatus == TODO) {
+            throw new IllegalTaskStateException(
+                    "Task with id " + task.getId() + " cannot move from DONE back to TODO."
+            );
+        }
+
+        if (task.getStatus() == DONE && newStatus == DONE) {
+            throw new IllegalTaskStateException(
+                    "Task with id " + task.getId() + " is already done."
+            );
+        }
+
+    }
+
+    @Override
+    public Task updateStatus(Long id, TaskStatus newStatus) {
+
+        Task task = taskRepository.findById(id)
+                .orElseThrow(() -> new TaskNotFoundException(id));
+
+        applyStatusChange(task, newStatus);
+
+        return taskRepository.save(task);
+    }
+
+    @Override
+    public void delete(Long id) {
+        if (!taskRepository.existsById(id)) {
+            throw new TaskNotFoundException(id);
+        }
+
+        taskRepository.deleteById(id);
+    }
+
+    @Override
+    public List<TaskResponse> getTasksByProjectId(Long projectId) {
+        return taskRepository.findByProjectId(projectId)
+                .stream()
+                .map(TaskMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    public Page<Task> search(
+            TaskStatus status,
+            Long projectId,
+            Long assigneeId,
+            LocalDate dueBefore,
+            Pageable pageable
+    ) {
+
+        Specification<Task> spec = TaskSpecifications.withFilters(
+                projectId,
+                status,
+                assigneeId,
+                dueBefore
+        );
+
+        return taskRepository.findAll(spec, pageable);
+    }
+
+    @Override
+    public Page<Task> searchByProject(
+            Long projectId,
+            TaskStatus status,
+            Long assigneeId,
+            LocalDate dueBefore,
+            Pageable pageable
+    ) {
+
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> new ProjectNotFoundException(projectId));
+
+        Specification<Task> spec = TaskSpecifications.withFilters(
+                projectId,
+                status,
+                assigneeId,
+                dueBefore
+        );
+
+        return taskRepository.findAll(spec, pageable);
+    }
+
+}
